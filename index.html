@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toko Roti Bahagia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .hidden { display: none; }
+        .animate-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-amber-50 to-orange-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-amber-600 text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <h1 class="text-2xl font-bold">🍞 Toko Roti Bahagia</h1>
+                <div class="flex gap-2 md:gap-4">
+                    <button onclick="showPage('catalog')" id="btn-catalog" class="flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg bg-amber-700 text-sm md:text-base">
+                        🏠 <span class="hidden sm:inline">Katalog</span>
+                    </button>
+                    <button onclick="showPage('cart')" id="btn-cart" class="flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg hover:bg-amber-700 relative text-sm md:text-base">
+                        🛒 <span class="hidden sm:inline">Keranjang</span>
+                        <span id="cart-badge" class="hidden absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"></span>
+                    </button>
+                    <button onclick="showPage('orders')" id="btn-orders" class="flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg hover:bg-amber-700 text-sm md:text-base">
+                        📋 <span class="hidden sm:inline">Riwayat</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Loading -->
+    <div id="loading" class="hidden flex items-center justify-center min-h-[60vh]">
+        <div class="text-center">
+            <div class="w-12 h-12 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="text-gray-600 text-lg">Memuat data...</p>
+        </div>
+    </div>
+
+    <!-- Catalog Page -->
+    <div id="page-catalog" class="container mx-auto p-4 md:p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-amber-800">Katalog Roti Online</h1>
+            <button onclick="loadData()" class="flex items-center gap-2 px-3 md:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm md:text-base">
+                🔄 <span class="hidden sm:inline">Refresh</span>
+            </button>
+        </div>
+        <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6"></div>
+    </div>
+
+    <!-- Cart Page -->
+    <div id="page-cart" class="hidden container mx-auto p-4 md:p-6 max-w-4xl">
+        <h1 class="text-2xl md:text-3xl font-bold text-amber-800 mb-6">Keranjang Belanja</h1>
+        <div id="cart-content"></div>
+    </div>
+
+    <!-- Orders Page -->
+    <div id="page-orders" class="hidden container mx-auto p-4 md:p-6 max-w-6xl">
+        <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
+            <h1 class="text-2xl md:text-3xl font-bold text-amber-800">Riwayat Pesanan</h1>
+            <button onclick="clearAllData()" class="flex items-center gap-2 px-3 md:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm md:text-base">
+                🗑️ <span class="hidden sm:inline">Hapus Semua</span>
+            </button>
+        </div>
+        <div id="orders-content"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="bg-amber-600 text-white text-center py-3 text-xs md:text-sm mt-8">
+        💾 Data tersimpan otomatis di browser Anda
+    </div>
+
+    <script>
+        // Data produk
+        const products = [
+            { id: 1, name: 'Roti Tawar', price: 15000, image: '🍞', category: 'Roti Tawar' },
+            { id: 2, name: 'Roti Gandum', price: 18000, image: '🥖', category: 'Roti Tawar' },
+            { id: 3, name: 'Roti Manis Cokelat', price: 12000, image: '🥐', category: 'Roti Manis' },
+            { id: 4, name: 'Roti Manis Keju', price: 12000, image: '🧈', category: 'Roti Manis' },
+            { id: 5, name: 'Donat Gula', price: 8000, image: '🍩', category: 'Donat' },
+            { id: 6, name: 'Donat Cokelat', price: 10000, image: '🍩', category: 'Donat' },
+            { id: 7, name: 'Croissant Original', price: 15000, image: '🥐', category: 'Pastry' },
+            { id: 8, name: 'Danish Pastry', price: 17000, image: '🥮', category: 'Pastry' }
+        ];
+
+        // State
+        let cart = [];
+        let orders = [];
+        let customerInfo = { name: '', address: '', phone: '', paymentMethod: 'cash' };
+
+        // Storage functions
+        function saveToStorage(key, data) {
+            localStorage.setItem(key, JSON.stringify(data));
+        }
+
+        function getFromStorage(key) {
+            const data = localStorage.getItem(key);
+            return data ? JSON.parse(data) : null;
+        }
+
+        function loadData() {
+            cart = getFromStorage('toko-roti:cart') || [];
+            orders = getFromStorage('toko-roti:orders') || [];
+            customerInfo = getFromStorage('toko-roti:customer') || { name: '', address: '', phone: '', paymentMethod: 'cash' };
+            renderCurrentPage();
+        }
+
+        function clearAllData() {
+            if (confirm('Apakah Anda yakin ingin menghapus semua data?')) {
+                localStorage.removeItem('toko-roti:cart');
+                localStorage.removeItem('toko-roti:orders');
+                localStorage.removeItem('toko-roti:customer');
+                cart = [];
+                orders = [];
+                customerInfo = { name: '', address: '', phone: '', paymentMethod: 'cash' };
+                renderCurrentPage();
+                alert('Semua data berhasil dihapus!');
+            }
+        }
+
+        // Cart functions
+        function addToCart(productId) {
+            const product = products.find(p => p.id === productId);
+            const existingItem = cart.find(item => item.id === productId);
+            
+            if (existingItem) {
+                existingItem.quantity++;
+            } else {
+                cart.push({ ...product, quantity: 1 });
+            }
+            
+            saveToStorage('toko-roti:cart', cart);
+            updateCartBadge();
+            renderCurrentPage();
+        }
+
+        function updateQuantity(productId, change) {
+            const item = cart.find(item => item.id === productId);
+            if (item) {
+                item.quantity += change;
+                if (item.quantity <= 0) {
+                    cart = cart.filter(item => item.id !== productId);
+                }
+            }
+            saveToStorage('toko-roti:cart', cart);
+            renderCart();
+            updateCartBadge();
+        }
+
+        function removeFromCart(productId) {
+            cart = cart.filter(item => item.id !== productId);
+            saveToStorage('toko-roti:cart', cart);
+            renderCart();
+            updateCartBadge();
+        }
+
+        function calculateTotal() {
+            return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+        }
+
+        function updateCartBadge() {
+            const badge = document.getElementById('cart-badge');
+            if (cart.length > 0) {
+                badge.classList.remove('hidden');
+                badge.textContent = cart.length;
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // Checkout
+        function checkout() {
+            if (cart.length === 0) {
+                alert('Keranjang masih kosong!');
+                return;
+            }
+            if (!customerInfo.name || !customerInfo.address || !customerInfo.phone) {
+                alert('Mohon lengkapi data pelanggan!');
+                return;
+            }
+            if (!customerInfo.paymentMethod) {
+                alert('Mohon pilih metode pembayaran!');
+                return;
+            }
+
+            const newOrder = {
+                id: Date.now(),
+                date: new Date().toLocaleString('id-ID'),
+                items: [...cart],
+                total: calculateTotal(),
+                customer: { ...customerInfo },
+                paymentMethod: customerInfo.paymentMethod,
+                status: 'Diproses'
+            };
+
+            orders.unshift(newOrder);
+            saveToStorage('toko-roti:orders', orders);
+            
+            cart = [];
+            saveToStorage('toko-roti:cart', cart);
+            
+            updateCartBadge();
+            showPage('orders');
+            alert('Pesanan berhasil dibuat!');
+        }
+
+        // Render functions
+        function renderCatalog() {
+            const grid = document.getElementById('products-grid');
+            grid.innerHTML = products.map(product => `
+                <div class="bg-white rounded-lg shadow-md p-4 hover:shadow-xl transition-shadow">
+                    <div class="text-4xl md:text-6xl text-center mb-3">${product.image}</div>
+                    <h3 class="font-semibold text-base md:text-lg text-gray-800 mb-2">${product.name}</h3>
+                    <p class="text-xs md:text-sm text-gray-500 mb-2">${product.category}</p>
+                    <p class="text-lg md:text-xl font-bold text-amber-600 mb-4">
+                        Rp ${product.price.toLocaleString('id-ID')}
+                    </p>
+                    <button onclick="addToCart(${product.id})" 
+                        class="w-full bg-amber-500 text-white py-2 rounded-lg hover:bg-amber-600 transition-colors text-sm md:text-base">
+                        ➕ Tambah ke Keranjang
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function renderCart() {
+            const content = document.getElementById('cart-content');
+            
+            if (cart.length === 0) {
+                content.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="text-6xl mb-4">🛒</div>
+                        <p class="text-gray-500 text-lg">Keranjang Anda masih kosong</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const total = calculateTotal();
+            content.innerHTML = `
+                <div class="bg-white rounded-lg shadow-md mb-6">
+                    ${cart.map(item => `
+                        <div class="flex items-center gap-2 md:gap-4 p-3 md:p-4 border-b last:border-b-0 flex-wrap">
+                            <div class="text-3xl md:text-4xl">${item.image}</div>
+                            <div class="flex-1 min-w-[120px]">
+                                <h3 class="font-semibold text-sm md:text-base text-gray-800">${item.name}</h3>
+                                <p class="text-amber-600 font-bold text-sm md:text-base">
+                                    Rp ${item.price.toLocaleString('id-ID')}
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2 md:gap-3">
+                                <button onclick="updateQuantity(${item.id}, -1)" 
+                                    class="bg-gray-200 px-2 md:px-3 py-1 rounded hover:bg-gray-300 text-sm md:text-base">➖</button>
+                                <span class="font-semibold w-6 md:w-8 text-center text-sm md:text-base">${item.quantity}</span>
+                                <button onclick="updateQuantity(${item.id}, 1)" 
+                                    class="bg-gray-200 px-2 md:px-3 py-1 rounded hover:bg-gray-300 text-sm md:text-base">➕</button>
+                                <button onclick="removeFromCart(${item.id})" 
+                                    class="bg-red-500 text-white px-2 md:px-3 py-1 rounded hover:bg-red-600 ml-1 md:ml-2 text-sm md:text-base">🗑️</button>
+                            </div>
+                            <div class="font-bold text-gray-800 min-w-[80px] md:min-w-[100px] text-right text-sm md:text-base w-full md:w-auto">
+                                Rp ${(item.price * item.quantity).toLocaleString('id-ID')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
+                    <h2 class="text-lg md:text-xl font-bold mb-4 text-gray-800">Data Pelanggan</h2>
+                    <div class="space-y-4">
+                        <input type="text" id="customer-name" placeholder="Nama Lengkap" 
+                            value="${customerInfo.name}"
+                            class="w-full px-3 md:px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm md:text-base">
+                        <input type="text" id="customer-address" placeholder="Alamat Lengkap" 
+                            value="${customerInfo.address}"
+                            class="w-full px-3 md:px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm md:text-base">
+                        <input type="tel" id="customer-phone" placeholder="Nomor Telepon" 
+                            value="${customerInfo.phone}"
+                            class="w-full px-3 md:px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm md:text-base">
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
+                    <h2 class="text-lg md:text-xl font-bold mb-4 text-gray-800">Metode Pembayaran</h2>
+                    <div class="space-y-3">
+                        <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-amber-50 transition-colors ${customerInfo.paymentMethod === 'cash' ? 'border-amber-500 bg-amber-50' : 'border-gray-200'}">
+                            <input type="radio" name="payment" value="cash" ${customerInfo.paymentMethod === 'cash' ? 'checked' : ''} 
+                                class="w-4 h-4 text-amber-600 mr-3">
+                            <div class="flex-1">
+                                <div class="font-semibold text-gray-800">💵 Cash / Tunai</div>
+                                <div class="text-xs md:text-sm text-gray-500">Bayar saat pesanan tiba</div>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-amber-50 transition-colors ${customerInfo.paymentMethod === 'transfer' ? 'border-amber-500 bg-amber-50' : 'border-gray-200'}">
+                            <input type="radio" name="payment" value="transfer" ${customerInfo.paymentMethod === 'transfer' ? 'checked' : ''} 
+                                class="w-4 h-4 text-amber-600 mr-3">
+                            <div class="flex-1">
+                                <div class="font-semibold text-gray-800">🏦 Transfer Bank</div>
+                                <div class="text-xs md:text-sm text-gray-500">BCA, BNI, Mandiri, BRI</div>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-amber-50 transition-colors ${customerInfo.paymentMethod === 'ewallet' ? 'border-amber-500 bg-amber-50' : 'border-gray-200'}">
+                            <input type="radio" name="payment" value="ewallet" ${customerInfo.paymentMethod === 'ewallet' ? 'checked' : ''} 
+                                class="w-4 h-4 text-amber-600 mr-3">
+                            <div class="flex-1">
+                                <div class="font-semibold text-gray-800">📱 E-Wallet</div>
+                                <div class="text-xs md:text-sm text-gray-500">GoPay, OVO, Dana, ShopeePay</div>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-amber-50 transition-colors ${customerInfo.paymentMethod === 'qris' ? 'border-amber-500 bg-amber-50' : 'border-gray-200'}">
+                            <input type="radio" name="payment" value="qris" ${customerInfo.paymentMethod === 'qris' ? 'checked' : ''} 
+                                class="w-4 h-4 text-amber-600 mr-3">
+                            <div class="flex-1">
+                                <div class="font-semibold text-gray-800">📲 QRIS</div>
+                                <div class="text-xs md:text-sm text-gray-500">Scan QR untuk pembayaran</div>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-amber-50 transition-colors ${customerInfo.paymentMethod === 'debit' ? 'border-amber-500 bg-amber-50' : 'border-gray-200'}">
+                            <input type="radio" name="payment" value="debit" ${customerInfo.paymentMethod === 'debit' ? 'checked' : ''} 
+                                class="w-4 h-4 text-amber-600 mr-3">
+                            <div class="flex-1">
+                                <div class="font-semibold text-gray-800">💳 Kartu Debit/Kredit</div>
+                                <div class="text-xs md:text-sm text-gray-500">Visa, Mastercard, JCB</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="bg-amber-50 rounded-lg p-4 md:p-6 mb-6">
+                    <div class="flex justify-between items-center text-xl md:text-2xl font-bold">
+                        <span class="text-gray-800">Total:</span>
+                        <span class="text-amber-600">Rp ${total.toLocaleString('id-ID')}</span>
+                    </div>
+                </div>
+
+                <button onclick="processCheckout()" 
+                    class="w-full bg-green-500 text-white py-3 md:py-4 rounded-lg text-base md:text-lg font-semibold hover:bg-green-600 transition-colors">
+                    Checkout Sekarang
+                </button>
+            `;
+
+            // Add event listeners for inputs
+            document.getElementById('customer-name').addEventListener('input', (e) => {
+                customerInfo.name = e.target.value;
+                saveToStorage('toko-roti:customer', customerInfo);
+            });
+            document.getElementById('customer-address').addEventListener('input', (e) => {
+                customerInfo.address = e.target.value;
+                saveToStorage('toko-roti:customer', customerInfo);
+            });
+            document.getElementById('customer-phone').addEventListener('input', (e) => {
+                customerInfo.phone = e.target.value;
+                saveToStorage('toko-roti:customer', customerInfo);
+            });
+
+            // Add event listeners for payment method
+            document.querySelectorAll('input[name="payment"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    customerInfo.paymentMethod = e.target.value;
+                    saveToStorage('toko-roti:customer', customerInfo);
+                    renderCart(); // Re-render to update selected state
+                });
+            });
+        }
+
+        function processCheckout() {
+            customerInfo.name = document.getElementById('customer-name').value;
+            customerInfo.address = document.getElementById('customer-address').value;
+            customerInfo.phone = document.getElementById('customer-phone').value;
+            
+            const selectedPayment = document.querySelector('input[name="payment"]:checked');
+            if (selectedPayment) {
+                customerInfo.paymentMethod = selectedPayment.value;
+            }
+            
+            saveToStorage('toko-roti:customer', customerInfo);
+            checkout();
+        }
+
+        function renderOrders() {
+            const content = document.getElementById('orders-content');
+            
+            if (orders.length === 0) {
+                content.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="text-6xl mb-4">📋</div>
+                        <p class="text-gray-500 text-lg">Belum ada riwayat pesanan</p>
+                    </div>
+                `;
+                return;
+            }
+
+            content.innerHTML = `
+                <div class="space-y-4 md:space-y-6">
+                    ${orders.map(order => {
+                        const paymentLabels = {
+                            'cash': '💵 Cash/Tunai',
+                            'transfer': '🏦 Transfer Bank',
+                            'ewallet': '📱 E-Wallet',
+                            'qris': '📲 QRIS',
+                            'debit': '💳 Kartu Debit/Kredit'
+                        };
+                        const paymentLabel = paymentLabels[order.paymentMethod] || order.paymentMethod;
+                        
+                        return `
+                        <div class="bg-white rounded-lg shadow-md p-4 md:p-6">
+                            <div class="flex justify-between items-start mb-4 border-b pb-4 flex-wrap gap-2">
+                                <div>
+                                    <h3 class="font-bold text-base md:text-lg text-gray-800">Order #${order.id}</h3>
+                                    <p class="text-xs md:text-sm text-gray-500">${order.date}</p>
+                                    <p class="text-xs md:text-sm text-gray-600 mt-2">
+                                        <strong>Pelanggan:</strong> ${order.customer.name}
+                                    </p>
+                                    <p class="text-xs md:text-sm text-gray-600">
+                                        <strong>Alamat:</strong> ${order.customer.address}
+                                    </p>
+                                    <p class="text-xs md:text-sm text-gray-600">
+                                        <strong>Telepon:</strong> ${order.customer.phone}
+                                    </p>
+                                    <p class="text-xs md:text-sm text-gray-600 mt-1">
+                                        <strong>Pembayaran:</strong> <span class="text-amber-600 font-semibold">${paymentLabel}</span>
+                                    </p>
+                                </div>
+                                <span class="bg-amber-100 text-amber-800 px-3 md:px-4 py-1 md:py-2 rounded-full text-xs md:text-sm font-semibold">
+                                    ${order.status}
+                                </span>
+                            </div>
+                            
+                            <div class="space-y-2 mb-4">
+                                ${order.items.map(item => `
+                                    <div class="flex justify-between items-center flex-wrap gap-2">
+                                        <div class="flex items-center gap-2 md:gap-3">
+                                            <span class="text-xl md:text-2xl">${item.image}</span>
+                                            <span class="text-sm md:text-base text-gray-700">
+                                                ${item.name} x ${item.quantity}
+                                            </span>
+                                        </div>
+                                        <span class="font-semibold text-sm md:text-base text-gray-800">
+                                            Rp ${(item.price * item.quantity).toLocaleString('id-ID')}
+                                        </span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            <div class="border-t pt-4">
+                                <div class="flex justify-between items-center text-lg md:text-xl font-bold">
+                                    <span class="text-gray-800">Total:</span>
+                                    <span class="text-amber-600">Rp ${order.total.toLocaleString('id-ID')}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `}).join('')}
+                </div>
+            `;
+        }
+
+        // Page navigation
+        function showPage(page) {
+            document.getElementById('page-catalog').classList.add('hidden');
+            document.getElementById('page-cart').classList.add('hidden');
+            document.getElementById('page-orders').classList.add('hidden');
+            
+            document.getElementById('btn-catalog').classList.remove('bg-amber-700');
+            document.getElementById('btn-cart').classList.remove('bg-amber-700');
+            document.getElementById('btn-orders').classList.remove('bg-amber-700');
+            
+            document.getElementById('page-' + page).classList.remove('hidden');
+            document.getElementById('btn-' + page).classList.add('bg-amber-700');
+            
+            renderCurrentPage();
+        }
+
+        function renderCurrentPage() {
+            if (!document.getElementById('page-catalog').classList.contains('hidden')) {
+                renderCatalog();
+            } else if (!document.getElementById('page-cart').classList.contains('hidden')) {
+                renderCart();
+            } else if (!document.getElementById('page-orders').classList.contains('hidden')) {
+                renderOrders();
+            }
+        }
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            renderCatalog();
+            updateCartBadge();
+        });
+    </script>
+</body>
+</html>
